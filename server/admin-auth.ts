@@ -42,8 +42,10 @@ export function hasAdminConfiguration() {
 
 export function credentialsAreValid(username: string, password: string) {
   if (!hasAdminConfiguration()) return false;
+  const normalizedUsername = username.trim().toLowerCase();
+  const configuredUsername = (process.env.ADMIN_USERNAME ?? "").trim().toLowerCase();
   return (
-    constantTimeMatches(username, process.env.ADMIN_USERNAME ?? "") &&
+    constantTimeMatches(normalizedUsername, configuredUsername) &&
     constantTimeMatches(password, process.env.ADMIN_PASSWORD ?? "")
   );
 }

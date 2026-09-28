@@ -356,10 +356,15 @@ export default function App() {
       });
 
       if (!response.ok) {
+        const errorMessages: Record<number, string> = {
+          401: "Usuario o contraseña incorrectos. Revisa los valores configurados en Vercel.",
+          403: "Vercel bloqueó la solicitud. Abre la página desde el mismo dominio del sitio.",
+          404: "No se encontró la función de acceso. Revisa el último despliegue de Vercel.",
+          503: "Falta configurar ADMIN_USERNAME, ADMIN_PASSWORD o ADMIN_SESSION_SECRET en Production.",
+        };
         setLoginStatus(
-          response.status === 503
-            ? "El acceso de administrador aún no está configurado."
-            : "Usuario o contraseña incorrectos.",
+          errorMessages[response.status] ??
+            `El servidor de acceso respondió con un error (${response.status}).`,
         );
         return;
       }
