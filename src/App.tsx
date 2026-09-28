@@ -226,8 +226,17 @@ function AdminPanel({
       });
       updateField("audioUrl", blob.url);
       setStatus("Audio subido. Guarda los cambios para publicarlo.");
-    } catch {
-      setStatus("No se pudo subir el audio. Revisa la configuración de Vercel Blob.");
+    } catch (error) {
+      console.error("Vercel Blob upload failed", error);
+      const reader = new FileReader();
+      reader.onload = () => {
+        updateField("audioUrl", String(reader.result));
+        setStatus("No se pudo subir a la nube. El audio quedó guardado solo en este dispositivo.");
+      };
+      reader.onerror = () => {
+        setStatus("No se pudo subir ni guardar el audio. Intenta con otro archivo.");
+      };
+      reader.readAsDataURL(file);
     } finally {
       setIsUploadingAudio(false);
       event.target.value = "";
