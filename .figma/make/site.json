@@ -1,0 +1,10 @@
+{
+  "description": "Enables content creators to edit and manage audio and text while providing users secure access via QR codes without editing permissions.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
