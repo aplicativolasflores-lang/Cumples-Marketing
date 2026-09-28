@@ -21,6 +21,7 @@ const defaultGreeting: Greeting = {
 };
 
 const STORAGE_KEY = "las-flores-greeting";
+const RESERVATION_MESSAGE = "Buenos días, quisiera hacer una reserva.";
 
 function withGreetingDefaults(value: Partial<Greeting>): Greeting {
   const greeting = { ...defaultGreeting, ...value };
@@ -51,9 +52,21 @@ function greetingFromUrl() {
   }
 }
 
+function reservationUrl(buttonUrl: string) {
+  try {
+    const url = new URL(buttonUrl);
+    url.searchParams.set("text", RESERVATION_MESSAGE);
+    return url.toString();
+  } catch {
+    return buttonUrl;
+  }
+}
+
 function GreetingCard({ greeting }: { greeting: Greeting }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showReservationMessage, setShowReservationMessage] = useState(false);
+  const whatsappReservationUrl = reservationUrl(greeting.buttonUrl);
 
   async function toggleAudio() {
     const audio = audioRef.current;
@@ -71,7 +84,8 @@ function GreetingCard({ greeting }: { greeting: Greeting }) {
   }
 
   return (
-    <main className="card">
+    <>
+      <main className="card">
       <div className="card-content">
         <img alt="Flores.ng" className="brand-logo" src={floresLogo} />
         <div className="greeting-copy">
@@ -124,13 +138,44 @@ function GreetingCard({ greeting }: { greeting: Greeting }) {
         <a
           className="reserve-button"
           href={greeting.buttonUrl}
+          onClick={(event) => {
+            event.preventDefault();
+            setShowReservationMessage(true);
+          }}
           rel="noreferrer"
           target="_blank"
         >
           {greeting.buttonLabel}
         </a>
       </div>
-    </main>
+      </main>
+      {showReservationMessage && (
+      <div
+        className="reservation-backdrop"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowReservationMessage(false);
+        }}
+      >
+        <section
+          aria-labelledby="reservation-message-title"
+          aria-modal="true"
+          className="reservation-dialog"
+          role="dialog"
+        >
+          <h2 id="reservation-message-title">Haz tu reserva</h2>
+          <p>Para hacer tu reserva, continúa la conversación en WhatsApp.</p>
+          <div className="reservation-actions">
+            <button onClick={() => setShowReservationMessage(false)} type="button">
+              Cancelar
+            </button>
+            <a href={whatsappReservationUrl} rel="noreferrer" target="_blank">
+              Continuar a WhatsApp
+            </a>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -174,6 +219,11 @@ function AdminPanel({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!/^#[0-9a-fA-F]{6}$/.test(draft.backgroundColor)) {
+      setStatus("Ingresa el color en formato hexadecimal, por ejemplo #1d541e.");
+      return;
+    }
+
     try {
       onSave(draft);
       setStatus("Cambios guardados en este dispositivo.");
@@ -217,12 +267,25 @@ function AdminPanel({
 
         <label>
           Color del fondo
-          <input
-            aria-label="Color del fondo de la página"
-            onChange={(event) => updateField("backgroundColor", event.target.value)}
-            type="color"
-            value={draft.backgroundColor}
-          />
+          <div className="color-inputs">
+            <input
+              aria-label="Elegir color del fondo"
+              className="color-picker"
+              onChange={(event) => updateField("backgroundColor", event.target.value)}
+              type="color"
+              value={draft.backgroundColor}
+            />
+            <input
+              aria-label="Código hexadecimal del color del fondo"
+              className="color-code-input"
+              maxLength={7}
+              onChange={(event) => updateField("backgroundColor", event.target.value)}
+              placeholder="#1d541e"
+              spellCheck={false}
+              type="text"
+              value={draft.backgroundColor}
+            />
+          </div>
         </label>
 
         <div className="field-row">

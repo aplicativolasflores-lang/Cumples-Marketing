@@ -4,9 +4,9 @@ El candado abre el formulario de acceso. Las credenciales se validan en las func
 
 En el proyecto de Vercel, abre **Settings > Environment Variables** y agrega estas variables para los entornos que usarás:
 
-- `ADMIN_USERNAME`: el nombre de usuario que elijas.
-- `ADMIN_PASSWORD`: una contraseña fuerte que no uses en otro sitio.
-- `ADMIN_SESSION_SECRET`: una clave aleatoria de al menos 32 caracteres.
+- `ADMIN_USERNAME`: 
+- `ADMIN_PASSWORD`: 
+- `ADMIN_SESSION_SECRET`: 
 
 Puedes generar la clave de sesión en PowerShell con:
 

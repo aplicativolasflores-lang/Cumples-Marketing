@@ -300,6 +300,70 @@ a {
   background: #164c17;
 }
 
+.reservation-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+  background: rgba(12, 28, 17, 0.55);
+}
+
+.reservation-dialog {
+  width: min(100%, 390px);
+  padding: 30px;
+  box-sizing: border-box;
+  border: 1px solid #e1e7e0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(12, 28, 17, 0.24);
+}
+
+.reservation-dialog h2 {
+  margin: 0;
+  color: #15243a;
+  font-size: 23px;
+}
+
+.reservation-dialog p {
+  margin: 12px 0 24px;
+  color: #617064;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.reservation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.reservation-actions button,
+.reservation-actions a {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reservation-actions button {
+  border: 1px solid #d6ded6;
+  color: #617064;
+  background: #f7f9f7;
+}
+
+.reservation-actions a {
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+  background: #1d5b1d;
+}
+
 .admin-mode {
   align-items: stretch;
   gap: 32px;
@@ -402,6 +466,25 @@ a {
   transition:
     border 150ms ease,
     box-shadow 150ms ease;
+}
+
+.color-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-panel input.color-picker {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 42px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.admin-panel input.color-code-input {
+  flex: 1;
+  font-family: monospace;
 }
 
 .admin-panel textarea {
