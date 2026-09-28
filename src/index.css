@@ -114,6 +114,14 @@ a {
   cursor: pointer;
 }
 
+.login-logo {
+  display: block;
+  width: min(100%, 150px);
+  max-height: 68px;
+  margin: 0 auto 20px;
+  object-fit: contain;
+}
+
 .login-dialog h2 {
   margin: 0 0 22px;
   color: #15243a;

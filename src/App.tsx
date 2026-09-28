@@ -450,6 +450,7 @@ export default function App() {
             >
               ×
             </button>
+            <img alt="Flores.ng" className="login-logo" src={floresLogo} />
             <span className="eyebrow">Área privada</span>
             <h2 id="admin-login-title">Acceso de administrador</h2>
             <form onSubmit={handleAdminLogin}>
