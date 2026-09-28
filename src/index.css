@@ -411,23 +411,24 @@ a {
   letter-spacing: -0.7px;
 }
 
-.preview-link {
+.admin-navigation {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: #326b36;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
+  gap: 16px;
 }
 
-.preview-link svg {
-  width: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.home-link {
+  border: 0;
+  padding: 0;
+  color: #617064;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-link:hover {
+  color: #1d5b1d;
 }
 
 .admin-panel form {
@@ -630,6 +631,7 @@ a {
   }
 
   .admin-heading,
+  .admin-navigation,
   .field-row,
   .audio-options {
     flex-direction: column;

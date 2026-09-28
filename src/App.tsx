@@ -1,4 +1,4 @@
-import { ChangeEvent, CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 import floresLogo from "./imports/flores.png";
 
 type Greeting = {
@@ -21,7 +21,8 @@ const defaultGreeting: Greeting = {
 };
 
 const STORAGE_KEY = "las-flores-greeting";
-const RESERVATION_MESSAGE = "Buenos días, quisiera hacer una reserva.";
+const RESERVATION_MESSAGE =
+  "Hola, buenos días. Me gustaría hacer una reserva. ¿Podrían ayudarme, por favor?";
 
 function withGreetingDefaults(value: Partial<Greeting>): Greeting {
   const greeting = { ...defaultGreeting, ...value };
@@ -182,20 +183,15 @@ function GreetingCard({ greeting }: { greeting: Greeting }) {
 function AdminPanel({
   greeting,
   onSave,
+  onExit,
 }: {
   greeting: Greeting;
   onSave: (greeting: Greeting) => void;
+  onExit: () => void;
 }) {
   const [draft, setDraft] = useState(greeting);
   const [status, setStatus] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
-
-  const publicUrl = useMemo(() => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("admin");
-    url.searchParams.set("g", encodeGreeting(greeting));
-    return url.toString();
-  }, [greeting]);
 
   function updateField(field: keyof Greeting, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -239,12 +235,11 @@ function AdminPanel({
           <span className="eyebrow">Vista privada</span>
           <h2>Editar dedicatoria</h2>
         </div>
-        <a className="preview-link" href={publicUrl} target="_blank">
-          Ver página pública
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M5 12h14M14 7l5 5-5 5" />
-          </svg>
-        </a>
+        <div className="admin-navigation">
+          <button className="home-link" onClick={onExit} type="button">
+            Volver al inicio
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -493,7 +488,13 @@ export default function App() {
         </svg>
       </button>
       <GreetingCard greeting={greeting} />
-      {isAdmin && <AdminPanel greeting={greeting} onSave={saveGreeting} />}
+      {isAdmin && (
+        <AdminPanel
+          greeting={greeting}
+          onExit={() => void handleAdminLogout()}
+          onSave={saveGreeting}
+        />
+      )}
       {showLogin && (
         <div
           className="login-backdrop"
