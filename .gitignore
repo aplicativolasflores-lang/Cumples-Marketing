@@ -1,21 +1,80 @@
+# Dependencies
 node_modules/
+jspm_packages/
+web_modules/
+.pnpm-store/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+bower_components/
+
+# Build output and coverage
 dist/
 build/
+build/Release/
+coverage/
+*.lcov
+.nyc_output/
+.next/
+out/
+.nuxt/
+.output/
+.vuepress/dist/
+.temp/
+.svelte-kit/
+**/.vitepress/dist
+**/.vitepress/cache
+
+# Caches
 .cache/
-.env*
+.parcel-cache/
+.npm/
 .vite/
-vite.config.*.timestamp-*
+.grunt/
+.docusaurus/
+.serverless/
+.fusebox/
+.dynamodb/
+.firebase/
+lib-cov/
 *.tsbuildinfo
-*-debug.log*
+.eslintcache
+.stylelintcache
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and runtime data
 logs/
 *.log
-.claude-replay.*
-.tmp-*
-/.figma/design-context/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+pids/
+*.pid
+*.seed
+*.pid.lock
+*.tgz
+.yarn-integrity
+.node_repl_history
+.lock-wscript
+.tern-port
 
-# Platform-managed agentplat state, not project source. In the
-# client-initiated single-repo workspace layout (make's `Path: "."` spec) the
-# repo root IS the workspace root, so these land inside this repo rather than
-# beside it.
+# Vite timestamps
+vite.config.*.timestamp-*
+
+# Project and platform-managed files
+/.figma/design-context/
 /.plugins/
 /.opencode-skills/
+.claude-replay.*
+.tmp-*
