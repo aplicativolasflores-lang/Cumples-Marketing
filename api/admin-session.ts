@@ -3,7 +3,7 @@ import {
   ApiResponse,
   clearAdminCookie,
   hasValidAdminSession,
-} from "../server/admin-auth";
+} from "../server/admin-auth.js";
 
 export default function handler(request: ApiRequest, response: ApiResponse) {
   response.setHeader("Cache-Control", "no-store");
