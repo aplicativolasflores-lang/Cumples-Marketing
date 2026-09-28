@@ -377,26 +377,6 @@ export default function App() {
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    fetch("/api/admin-session", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (!response.ok) return false;
-        const result = (await response.json()) as { authenticated?: boolean };
-        return result.authenticated === true;
-      })
-      .then((authenticated) => {
-        if (active) setIsAdmin(authenticated);
-      })
-      .catch(() => {
-        if (active) setIsAdmin(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     document.title = isAdmin ? "Editar dedicatoria | Las Flores" : "Una dedicatoria para ti";
   }, [isAdmin]);
 
