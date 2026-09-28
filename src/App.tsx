@@ -1,4 +1,5 @@
 import { ChangeEvent, CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import floresLogo from "./imports/flores.png";
 
 type Greeting = {
@@ -191,6 +192,7 @@ function AdminPanel({
 }) {
   const [draft, setDraft] = useState(greeting);
   const [status, setStatus] = useState("");
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   function updateField(field: keyof Greeting, value: string) {
@@ -198,9 +200,15 @@ function AdminPanel({
     setStatus("");
   }
 
-  function handleAudio(event: ChangeEvent<HTMLInputElement>) {
+  async function handleAudio(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("audio/")) {
+      setStatus("Selecciona un archivo de audio válido.");
+      event.target.value = "";
+      return;
+    }
 
     if (file.size > 3.5 * 1024 * 1024) {
       setStatus("El archivo es demasiado grande. Usa un audio de hasta 3,5 MB o pega una URL.");
@@ -208,9 +216,22 @@ function AdminPanel({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => updateField("audioUrl", String(reader.result));
-    reader.readAsDataURL(file);
+    setIsUploadingAudio(true);
+    setStatus("Subiendo audio...");
+
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/audio-upload",
+      });
+      updateField("audioUrl", blob.url);
+      setStatus("Audio subido. Guarda los cambios para publicarlo.");
+    } catch {
+      setStatus("No se pudo subir el audio. Revisa la configuración de Vercel Blob.");
+    } finally {
+      setIsUploadingAudio(false);
+      event.target.value = "";
+    }
   }
 
   function handleSubmit(event: FormEvent) {
@@ -304,11 +325,16 @@ function AdminPanel({
         <fieldset>
           <legend>Audio</legend>
           <div className="audio-options">
-            <button className="upload-button" onClick={() => fileInput.current?.click()} type="button">
+            <button
+              className="upload-button"
+              disabled={isUploadingAudio}
+              onClick={() => fileInput.current?.click()}
+              type="button"
+            >
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" />
               </svg>
-              Subir MP3
+              {isUploadingAudio ? "Subiendo..." : "Subir MP3"}
             </button>
             <span>o</span>
             <input
