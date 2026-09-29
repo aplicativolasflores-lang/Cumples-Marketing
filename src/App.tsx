@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { upload } from "@vercel/blob/client"
+import { createClient } from "@supabase/supabase-js"
 import floresLogo from "./imports/flores.png"
 
 type ElementName = "image" | "title" | "message" | "audio" | "button"
@@ -50,6 +50,13 @@ const defaultGreeting: Greeting = {
 }
 
 const STORAGE_KEY = "las-flores-greeting"
+const AUDIO_BUCKET = "audio"
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseClient =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null
 const RESERVATION_MESSAGE =
   "Hola, buenos días. Me gustaría hacer una reserva. ¿Podrían ayudarme, por favor?"
 
@@ -406,16 +413,26 @@ function AdminPanel({
     setStatus("Subiendo audio...")
 
     try {
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/audio-upload",
-      })
-      updateField("audioUrl", blob.url)
-      setStatus("Audio subido. Guarda los cambios para publicarlo.")
+      if (!supabaseClient) throw new Error("Supabase configuration is missing")
+      const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "audio"
+      const path = `${crypto.randomUUID()}.${extension}`
+      const { data, error } = await supabaseClient.storage
+        .from(AUDIO_BUCKET)
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+        })
+      if (error) throw error
+
+      const { data: publicData } = supabaseClient.storage
+        .from(AUDIO_BUCKET)
+        .getPublicUrl(data.path)
+      updateField("audioUrl", publicData.publicUrl)
+      setStatus("Audio subido a Supabase. Guarda para publicarlo a todos.")
     } catch (error) {
-      console.error("Vercel Blob upload failed", error)
+      console.error("Supabase audio upload failed", error)
       setStatus(
-        "No se pudo subir a Vercel Blob. Revisa el Blob Store y vuelve a intentarlo.",
+        "No se pudo subir. Revisa tu acceso de administrador y el bucket de audio en Supabase.",
       )
     } finally {
       setIsUploadingAudio(false)
@@ -439,7 +456,7 @@ function AdminPanel({
       )
     } catch {
       setStatus(
-        "No se pudo publicar. Revisa la conexión y la configuración de Vercel Blob.",
+        "No se pudo publicar. Revisa la conexión y la configuración de Supabase.",
       )
     }
   }
@@ -646,24 +663,58 @@ export default function App() {
   const [draft, setDraft] = useState(greeting)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
-  const [loginUsername, setLoginUsername] = useState("")
   const [loginPassword, setLoginPassword] = useState("")
   const [loginStatus, setLoginStatus] = useState("")
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false)
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("g")) return
+    if (!supabaseClient) return
 
     let isActive = true
-    fetch("/api/greeting", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return
-        const sharedGreeting = withGreetingDefaults(await response.json())
-        if (!isActive) return
+    const syncAdminSession = (session: Awaited<ReturnType<typeof supabaseClient.auth.getSession>>["data"]["session"]) => {
+      if (isActive) {
+        setIsAdmin(session?.user.app_metadata?.role === "admin")
+      }
+    }
+    const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      syncAdminSession(session)
+    })
+
+    void supabaseClient.auth.getSession().then(({ data: sessionData, error }) => {
+      if (error) console.error("Supabase session check failed", error)
+      syncAdminSession(sessionData.session)
+    })
+
+    return () => {
+      isActive = false
+      data.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (
+      !supabaseClient ||
+      new URLSearchParams(window.location.search).has("g")
+    ) {
+      return
+    }
+
+    let isActive = true
+    void supabaseClient
+      .from("site_content")
+      .select("content")
+      .eq("id", "greeting")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Could not load shared greeting", error)
+          return
+        }
+        if (!isActive || !data) return
+        const sharedGreeting = withGreetingDefaults(data.content)
         setGreeting(sharedGreeting)
         setDraft(sharedGreeting)
       })
-      .catch(() => undefined)
 
     return () => {
       isActive = false
@@ -680,41 +731,26 @@ export default function App() {
     event.preventDefault()
     setLoginStatus("")
 
-    if (import.meta.env.DEV) {
-      if (loginUsername === "123" && loginPassword === "123") {
-        setDraft(greeting)
-        setIsAdmin(true)
-        setShowLogin(false)
-        setLoginPassword("")
-      } else {
-        setLoginStatus("En acceso local, el usuario y la contraseña son 123.")
-      }
+    if (!supabaseClient) {
+      setLoginStatus("Falta configurar la conexión de Supabase.")
       return
     }
 
     setIsSubmittingLogin(true)
     try {
-      const response = await fetch("/api/admin-login", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: loginUsername,
-          password: loginPassword,
-        }),
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: "Marketing@gmail.com",
+        password: loginPassword,
       })
 
-      if (!response.ok) {
-        const errorMessages: Record<number, string> = {
-          401: "Usuario o contraseña incorrectos. Revisa los valores configurados en Vercel.",
-          403: "Vercel bloqueó la solicitud. Abre la página desde el mismo dominio del sitio.",
-          404: "No se encontró la función de acceso. Revisa el último despliegue de Vercel.",
-          503: "Falta configurar ADMIN_USERNAME, ADMIN_PASSWORD o ADMIN_SESSION_SECRET en Production.",
-        }
-        setLoginStatus(
-          errorMessages[response.status] ??
-            `El servidor de acceso respondió con un error (${response.status}).`,
-        )
+      if (error || !data.user) {
+        setLoginStatus("Correo o contraseña incorrectos.")
+        return
+      }
+
+      if (data.user.app_metadata?.role !== "admin") {
+        await supabaseClient.auth.signOut()
+        setLoginStatus("Esta cuenta no tiene permisos de administrador.")
         return
       }
 
@@ -723,47 +759,38 @@ export default function App() {
       setShowLogin(false)
       setLoginPassword("")
     } catch {
-      setLoginStatus("No se pudo conectar con el servidor de acceso.")
+      setLoginStatus("No se pudo conectar con Supabase Auth.")
     } finally {
       setIsSubmittingLogin(false)
     }
   }
 
   async function handleAdminLogout() {
-    if (import.meta.env.DEV) {
-      setIsAdmin(false)
-      return
-    }
-
-    try {
-      const response = await fetch("/api/admin-session", {
-        method: "DELETE",
-        credentials: "same-origin",
-      })
-      if (response.ok) setIsAdmin(false)
-    } catch {
-      // Keep the editor visible if the server could not end the session.
-    }
+    if (!supabaseClient) return
+    const { error } = await supabaseClient.auth.signOut()
+    if (error) console.error("Supabase sign out failed", error)
+    setIsAdmin(false)
   }
 
   async function saveGreeting(nextGreeting: Greeting) {
     if (nextGreeting.audioUrl.startsWith("data:")) {
       throw new Error("Audio stored only in browser")
     }
+    if (!supabaseClient) throw new Error("Supabase configuration is missing")
+
+    const { error } = await supabaseClient.from("site_content").upsert(
+      {
+        id: "greeting",
+        content: nextGreeting,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    )
+    if (error) throw error
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextGreeting))
     setGreeting(nextGreeting)
     setDraft(nextGreeting)
-
-    if (import.meta.env.DEV) return false
-
-    const response = await fetch("/api/greeting", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nextGreeting),
-    })
-    if (!response.ok) throw new Error("Shared greeting save failed")
     return true
   }
 
@@ -853,12 +880,13 @@ export default function App() {
             <h2 id="admin-login-title">Acceso de administrador</h2>
             <form onSubmit={handleAdminLogin}>
               <label>
-                Usuario
+                Correo electrónico
                 <input
-                  autoComplete="username"
-                  onChange={(event) => setLoginUsername(event.target.value)}
+                  autoComplete="email"
+                  readOnly
                   required
-                  value={loginUsername}
+                  type="email"
+                  value="Marketing@gmail.com"
                 />
               </label>
               <label>
