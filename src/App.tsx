@@ -1,15 +1,34 @@
-import { ChangeEvent, CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
-import floresLogo from "./imports/flores.png";
+import {
+  ChangeEvent,
+  CSSProperties,
+  FormEvent,
+  KeyboardEvent,
+  PointerEvent,
+  ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
+import { upload } from "@vercel/blob/client"
+import floresLogo from "./imports/flores.png"
 
+type ElementName = "image" | "title" | "message" | "audio" | "button"
+type Position = {
+  x: number
+  y: number
+}
+type ElementPositions = Record<ElementName, Position>
 type Greeting = {
-  title: string;
-  message: string;
-  buttonLabel: string;
-  buttonUrl: string;
-  audioUrl: string;
-  backgroundColor: string;
-};
+  title: string
+  message: string
+  buttonLabel: string
+  buttonUrl: string
+  audioUrl: string
+  backgroundColor: string
+  messageAlign: "left" | "center" | "right" | "justify"
+  messageBold: boolean
+  positions: ElementPositions
+}
 
 const defaultGreeting: Greeting = {
   title: "Que viva el santo en las flores – Ángel Bedrillana",
@@ -19,242 +38,409 @@ const defaultGreeting: Greeting = {
   buttonUrl: "https://wa.me/51967456230",
   audioUrl: "",
   backgroundColor: "#1d541e",
-};
+  messageAlign: "justify",
+  messageBold: false,
+  positions: {
+    image: { x: 50, y: 14 },
+    title: { x: 50, y: 33 },
+    message: { x: 50, y: 55 },
+    audio: { x: 50, y: 78 },
+    button: { x: 50, y: 91 },
+  },
+}
 
-const STORAGE_KEY = "las-flores-greeting";
+const STORAGE_KEY = "las-flores-greeting"
 const RESERVATION_MESSAGE =
-  "Hola, buenos días. Me gustaría hacer una reserva. ¿Podrían ayudarme, por favor?";
+  "Hola, buenos días. Me gustaría hacer una reserva. ¿Podrían ayudarme, por favor?"
 
 function withGreetingDefaults(value: Partial<Greeting>): Greeting {
-  const greeting = { ...defaultGreeting, ...value };
+  const greeting = { ...defaultGreeting, ...value }
+  greeting.positions = { ...defaultGreeting.positions, ...value.positions }
   if (greeting.buttonUrl === "https://wa.me/") {
-    greeting.buttonUrl = defaultGreeting.buttonUrl;
+    greeting.buttonUrl = defaultGreeting.buttonUrl
   }
-  return greeting;
+  return greeting
+}
+
+function PositionedItem({
+  name,
+  label,
+  position,
+  isAdmin,
+  onMove,
+  children,
+}: {
+  name: ElementName
+  label: string
+  position: Position
+  isAdmin: boolean
+  onMove: (name: ElementName, position: Position) => void
+  children: ReactNode
+}) {
+  const grabOffset = useRef({ x: 0, y: 0 });
+
+  function moveToPointer(event: PointerEvent<HTMLDivElement>) {
+    const stage = event.currentTarget.closest(".card-content")
+    if (!stage) return
+    const bounds = stage.getBoundingClientRect()
+    const itemBounds = event.currentTarget.getBoundingClientRect();
+    const minX = Math.min(50, (itemBounds.width / 2 / bounds.width) * 100);
+    const minY = Math.min(50, (itemBounds.height / 2 / bounds.height) * 100);
+    onMove(name, {
+      x: Math.min(
+        100 - minX,
+        Math.max(minX, ((event.clientX - grabOffset.current.x - bounds.left) / bounds.width) * 100),
+      ),
+      y: Math.min(
+        100 - minY,
+        Math.max(minY, ((event.clientY - grabOffset.current.y - bounds.top) / bounds.height) * 100),
+      ),
+    })
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const adjustments: Record<string, Position> = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    }
+    const adjustment = adjustments[event.key]
+    if (!adjustment) return
+    event.preventDefault()
+    const step = event.shiftKey ? 5 : 1
+    onMove(name, {
+      x: Math.min(95, Math.max(5, position.x + adjustment.x * step)),
+      y: Math.min(97, Math.max(3, position.y + adjustment.y * step)),
+    })
+  }
+
+  return (
+    <div
+      aria-label={
+        isAdmin ? `Mover ${label}; usa las flechas del teclado` : undefined
+      }
+      className={`card-item card-item-${name}${isAdmin ? " is-draggable" : ""}`}
+      onKeyDown={isAdmin ? handleKeyDown : undefined}
+      onPointerDown={(event) => {
+        if (!isAdmin) return
+        event.preventDefault()
+        const itemBounds = event.currentTarget.getBoundingClientRect();
+        grabOffset.current = {
+          x: event.clientX - (itemBounds.left + itemBounds.width / 2),
+          y: event.clientY - (itemBounds.top + itemBounds.height / 2),
+        };
+        event.currentTarget.setPointerCapture(event.pointerId)
+        moveToPointer(event)
+      }}
+      onPointerMove={(event) => {
+        if (isAdmin && event.currentTarget.hasPointerCapture(event.pointerId)) {
+          moveToPointer(event)
+        }
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      }}
+      role={isAdmin ? "group" : undefined}
+      style={{ left: `${position.x}%`, top: `${position.y}%` }}
+      tabIndex={isAdmin ? 0 : undefined}
+    >
+      {children}
+    </div>
+  )
 }
 
 function encodeGreeting(greeting: Greeting) {
   const shareableGreeting = {
     ...greeting,
     audioUrl: greeting.audioUrl.startsWith("data:") ? "" : greeting.audioUrl,
-  };
-  const bytes = new TextEncoder().encode(JSON.stringify(shareableGreeting));
-  return btoa(String.fromCharCode(...bytes));
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(shareableGreeting))
+  return btoa(String.fromCharCode(...bytes))
 }
 
 function greetingFromUrl() {
-  const encoded = new URLSearchParams(window.location.search).get("g");
-  if (!encoded) return null;
+  const encoded = new URLSearchParams(window.location.search).get("g")
+  if (!encoded) return null
 
   try {
-    const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
-    return withGreetingDefaults(JSON.parse(new TextDecoder().decode(bytes)));
+    const bytes = Uint8Array.from(atob(encoded), (character) =>
+      character.charCodeAt(0),
+    )
+    return withGreetingDefaults(JSON.parse(new TextDecoder().decode(bytes)))
   } catch {
-    return null;
+    return null
   }
 }
 
 function reservationUrl(buttonUrl: string) {
   try {
-    const url = new URL(buttonUrl);
-    url.searchParams.set("text", RESERVATION_MESSAGE);
-    return url.toString();
+    const url = new URL(buttonUrl)
+    url.searchParams.set("text", RESERVATION_MESSAGE)
+    return url.toString()
   } catch {
-    return buttonUrl;
+    return buttonUrl
   }
 }
 
-function GreetingCard({ greeting }: { greeting: Greeting }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showReservationMessage, setShowReservationMessage] = useState(false);
-  const whatsappReservationUrl = reservationUrl(greeting.buttonUrl);
+function GreetingCard({
+  greeting,
+  isAdmin = false,
+  onMove,
+}: {
+  greeting: Greeting
+  isAdmin?: boolean
+  onMove?: (name: ElementName, position: Position) => void
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showReservationMessage, setShowReservationMessage] = useState(false)
+  const whatsappReservationUrl = reservationUrl(greeting.buttonUrl)
+  const moveElement = onMove ?? (() => {})
 
   async function toggleAudio() {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = audioRef.current
+    if (!audio) return
 
     if (audio.paused) {
       try {
-        await audio.play();
+        await audio.play()
       } catch {
-        setIsPlaying(false);
+        setIsPlaying(false)
       }
     } else {
-      audio.pause();
+      audio.pause()
     }
   }
 
   return (
     <>
       <main className="card">
-      <div className="card-content">
-        <img alt="Flores.ng" className="brand-logo" src={floresLogo} />
-        <div className="greeting-copy">
-          <h1>{greeting.title}</h1>
-          <p>{greeting.message}</p>
-        </div>
-
-        <div className="audio-control">
-          {greeting.audioUrl && (
-            <audio
-              aria-hidden="true"
-              hidden
-              onEnded={() => setIsPlaying(false)}
-              onPause={() => setIsPlaying(false)}
-              onPlay={() => setIsPlaying(true)}
-              preload="none"
-              ref={audioRef}
-              src={greeting.audioUrl}
-            />
-          )}
-          <button
-            aria-label={
-              !greeting.audioUrl
-                ? "Audio no disponible"
-                : isPlaying
-                  ? "Pausar audio"
-                  : "Escuchar dedicatoria"
-            }
-            aria-pressed={isPlaying}
-            className="audio-toggle"
-            disabled={!greeting.audioUrl}
-            onClick={toggleAudio}
-            type="button"
+        <div className="card-content">
+          <PositionedItem
+            name="image"
+            label="la imagen"
+            position={greeting.positions.image}
+            isAdmin={isAdmin}
+            onMove={moveElement}
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              {isPlaying ? (
-                <path d="M8 5h3v14H8zM15 5h3v14h-3z" />
-              ) : (
-                <path d="m8 5 12 7-12 7z" />
-              )}
-            </svg>
-            {!greeting.audioUrl
-              ? "Audio no disponible"
-              : isPlaying
-                ? "Pausar audio"
-                : "Escuchar dedicatoria"}
-          </button>
-        </div>
+            <img alt="Flores.ng" className="brand-logo" src={floresLogo} />
+          </PositionedItem>
+          <PositionedItem
+            name="title"
+            label="el título"
+            position={greeting.positions.title}
+            isAdmin={isAdmin}
+            onMove={moveElement}
+          >
+            <h1 className="greeting-title">{greeting.title}</h1>
+          </PositionedItem>
+          <PositionedItem
+            name="message"
+            label="el texto"
+            position={greeting.positions.message}
+            isAdmin={isAdmin}
+            onMove={moveElement}
+          >
+            <p
+              className="greeting-message"
+              style={{
+                textAlign: greeting.messageAlign,
+                fontWeight: greeting.messageBold ? 700 : 400,
+              }}
+            >
+              {greeting.message}
+            </p>
+          </PositionedItem>
 
-        <a
-          className="reserve-button"
-          href={greeting.buttonUrl}
-          onClick={(event) => {
-            event.preventDefault();
-            setShowReservationMessage(true);
-          }}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {greeting.buttonLabel}
-        </a>
-      </div>
+          <PositionedItem
+            name="audio"
+            label="el reproductor de audio"
+            position={greeting.positions.audio}
+            isAdmin={isAdmin}
+            onMove={moveElement}
+          >
+            <div className="audio-control">
+              {greeting.audioUrl && (
+                <audio
+                  aria-hidden="true"
+                  hidden
+                  onEnded={() => setIsPlaying(false)}
+                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  preload="none"
+                  ref={audioRef}
+                  src={greeting.audioUrl}
+                />
+              )}
+              <button
+                aria-label={
+                  !greeting.audioUrl
+                    ? "Audio no disponible"
+                    : isPlaying
+                      ? "Pausar audio"
+                      : "Escuchar dedicatoria"
+                }
+                aria-pressed={isPlaying}
+                className="audio-toggle"
+                disabled={!greeting.audioUrl}
+                onClick={toggleAudio}
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  {isPlaying ? (
+                    <path d="M8 5h3v14H8zM15 5h3v14h-3z" />
+                  ) : (
+                    <path d="m8 5 12 7-12 7z" />
+                  )}
+                </svg>
+                {!greeting.audioUrl
+                  ? "Audio no disponible"
+                  : isPlaying
+                    ? "Pausar audio"
+                    : "Escuchar dedicatoria"}
+              </button>
+            </div>
+          </PositionedItem>
+
+          <PositionedItem
+            name="button"
+            label="el botón"
+            position={greeting.positions.button}
+            isAdmin={isAdmin}
+            onMove={moveElement}
+          >
+            <a
+              className="reserve-button"
+              href={greeting.buttonUrl}
+              onClick={(event) => {
+                event.preventDefault()
+                if (!isAdmin) setShowReservationMessage(true)
+              }}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {greeting.buttonLabel}
+            </a>
+          </PositionedItem>
+        </div>
       </main>
       {showReservationMessage && (
-      <div
-        className="reservation-backdrop"
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setShowReservationMessage(false);
-        }}
-      >
-        <section
-          aria-labelledby="reservation-message-title"
-          aria-modal="true"
-          className="reservation-dialog"
-          role="dialog"
+        <div
+          className="reservation-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget)
+              setShowReservationMessage(false)
+          }}
         >
-          <h2 id="reservation-message-title">Haz tu reserva</h2>
-          <p>Para hacer tu reserva, continúa la conversación en WhatsApp.</p>
-          <div className="reservation-actions">
-            <button onClick={() => setShowReservationMessage(false)} type="button">
-              Cancelar
-            </button>
-            <a href={whatsappReservationUrl} rel="noreferrer" target="_blank">
-              Continuar a WhatsApp
-            </a>
-          </div>
-        </section>
-      </div>
-    )}
+          <section
+            aria-labelledby="reservation-message-title"
+            aria-modal="true"
+            className="reservation-dialog"
+            role="dialog"
+          >
+            <h2 id="reservation-message-title">Haz tu reserva</h2>
+            <p>Para hacer tu reserva, continúa la conversación en WhatsApp.</p>
+            <div className="reservation-actions">
+              <button
+                onClick={() => setShowReservationMessage(false)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <a href={whatsappReservationUrl} rel="noreferrer" target="_blank">
+                Continuar a WhatsApp
+              </a>
+            </div>
+          </section>
+        </div>
+      )}
     </>
-  );
+  )
 }
 
 function AdminPanel({
   greeting,
+  onDraftChange,
   onSave,
   onExit,
 }: {
-  greeting: Greeting;
-  onSave: (greeting: Greeting) => void;
-  onExit: () => void;
+  greeting: Greeting
+  onDraftChange: (greeting: Greeting) => void
+  onSave: (greeting: Greeting) => Promise<boolean>
+  onExit: () => void
 }) {
-  const [draft, setDraft] = useState(greeting);
-  const [status, setStatus] = useState("");
-  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState("")
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
 
-  function updateField(field: keyof Greeting, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
-    setStatus("");
+  function updateField<Field extends keyof Greeting>(
+    field: Field,
+    value: Greeting[Field],
+  ) {
+    onDraftChange({ ...greeting, [field]: value })
+    setStatus("")
   }
 
   async function handleAudio(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]
+    if (!file) return
 
     if (!file.type.startsWith("audio/")) {
-      setStatus("Selecciona un archivo de audio válido.");
-      event.target.value = "";
-      return;
+      setStatus("Selecciona un archivo de audio válido.")
+      event.target.value = ""
+      return
     }
 
     if (file.size > 3.5 * 1024 * 1024) {
-      setStatus("El archivo es demasiado grande. Usa un audio de hasta 3,5 MB o pega una URL.");
-      event.target.value = "";
-      return;
+      setStatus(
+        "El archivo es demasiado grande. Usa un audio de hasta 3,5 MB o pega una URL.",
+      )
+      event.target.value = ""
+      return
     }
 
-    setIsUploadingAudio(true);
-    setStatus("Subiendo audio...");
+    setIsUploadingAudio(true)
+    setStatus("Subiendo audio...")
 
     try {
       const blob = await upload(file.name, file, {
         access: "public",
         handleUploadUrl: "/api/audio-upload",
-      });
-      updateField("audioUrl", blob.url);
-      setStatus("Audio subido. Guarda los cambios para publicarlo.");
+      })
+      updateField("audioUrl", blob.url)
+      setStatus("Audio subido. Guarda los cambios para publicarlo.")
     } catch (error) {
-      console.error("Vercel Blob upload failed", error);
-      const reader = new FileReader();
-      reader.onload = () => {
-        updateField("audioUrl", String(reader.result));
-        setStatus("No se pudo subir a la nube. El audio quedó guardado solo en este dispositivo.");
-      };
-      reader.onerror = () => {
-        setStatus("No se pudo subir ni guardar el audio. Intenta con otro archivo.");
-      };
-      reader.readAsDataURL(file);
+      console.error("Vercel Blob upload failed", error)
+      setStatus(
+        "No se pudo subir a Vercel Blob. Revisa el Blob Store y vuelve a intentarlo.",
+      )
     } finally {
-      setIsUploadingAudio(false);
-      event.target.value = "";
+      setIsUploadingAudio(false)
+      event.target.value = ""
     }
   }
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!/^#[0-9a-fA-F]{6}$/.test(draft.backgroundColor)) {
-      setStatus("Ingresa el color en formato hexadecimal, por ejemplo #1d541e.");
-      return;
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!/^#[0-9a-fA-F]{6}$/.test(greeting.backgroundColor)) {
+      setStatus("Ingresa el color en formato hexadecimal, por ejemplo #1d541e.")
+      return
     }
 
     try {
-      onSave(draft);
-      setStatus("Cambios guardados en este dispositivo.");
+      const isShared = await onSave(greeting)
+      setStatus(
+        isShared
+          ? "Cambios publicados para todos los visitantes."
+          : "Cambios guardados solo en este dispositivo local.",
+      )
     } catch {
-      setStatus("No se pudo guardar. Prueba con una URL de audio o un archivo más pequeño.");
+      setStatus(
+        "No se pudo publicar. Revisa la conexión y la configuración de Vercel Blob.",
+      )
     }
   }
 
@@ -272,12 +458,58 @@ function AdminPanel({
         </div>
       </div>
 
+      <p className="field-help">
+        Arrastra los elementos en la vista previa para ubicarlos.
+      </p>
+      <div
+        className="alignment-control"
+        role="group"
+        aria-label="Alineación del texto"
+      >
+        <span>Alineación del texto</span>
+        {([
+          ["left", "Izquierda"],
+          ["center", "Centro"],
+          ["right", "Derecha"],
+          ["justify", "Justificado"],
+        ] as const).map(([alignment, label]) => (
+          <button
+            aria-pressed={greeting.messageAlign === alignment}
+            className={
+              greeting.messageAlign === alignment ? "alignment-active" : ""
+            }
+            key={alignment}
+            onClick={() => updateField("messageAlign", alignment)}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          aria-pressed={greeting.messageBold}
+          className={greeting.messageBold ? "alignment-active" : ""}
+          onClick={() => updateField("messageBold", !greeting.messageBold)}
+          type="button"
+        >
+          <strong>B</strong> Negrita
+        </button>
+      </div>
+      <button
+        className="reset-positions"
+        onClick={() =>
+          onDraftChange({ ...greeting, positions: defaultGreeting.positions })
+        }
+        type="button"
+      >
+        Restablecer posiciones
+      </button>
+
       <form onSubmit={handleSubmit}>
         <label>
           Título
           <input
             onChange={(event) => updateField("title", event.target.value)}
-            value={draft.title}
+            value={greeting.title}
           />
         </label>
 
@@ -286,7 +518,7 @@ function AdminPanel({
           <textarea
             onChange={(event) => updateField("message", event.target.value)}
             rows={5}
-            value={draft.message}
+            value={greeting.message}
           />
         </label>
 
@@ -296,19 +528,23 @@ function AdminPanel({
             <input
               aria-label="Elegir color del fondo"
               className="color-picker"
-              onChange={(event) => updateField("backgroundColor", event.target.value)}
+              onChange={(event) =>
+                updateField("backgroundColor", event.target.value)
+              }
               type="color"
-              value={draft.backgroundColor}
+              value={greeting.backgroundColor}
             />
             <input
               aria-label="Código hexadecimal del color del fondo"
               className="color-code-input"
               maxLength={7}
-              onChange={(event) => updateField("backgroundColor", event.target.value)}
+              onChange={(event) =>
+                updateField("backgroundColor", event.target.value)
+              }
               placeholder="#1d541e"
               spellCheck={false}
               type="text"
-              value={draft.backgroundColor}
+              value={greeting.backgroundColor}
             />
           </div>
         </label>
@@ -317,8 +553,10 @@ function AdminPanel({
           <label>
             Texto del botón
             <input
-              onChange={(event) => updateField("buttonLabel", event.target.value)}
-              value={draft.buttonLabel}
+              onChange={(event) =>
+                updateField("buttonLabel", event.target.value)
+              }
+              value={greeting.buttonLabel}
             />
           </label>
           <label>
@@ -326,7 +564,7 @@ function AdminPanel({
             <input
               onChange={(event) => updateField("buttonUrl", event.target.value)}
               type="url"
-              value={draft.buttonUrl}
+              value={greeting.buttonUrl}
             />
           </label>
         </div>
@@ -351,7 +589,9 @@ function AdminPanel({
               onChange={(event) => updateField("audioUrl", event.target.value)}
               placeholder="Pega una URL pública del audio"
               type="url"
-              value={draft.audioUrl.startsWith("data:") ? "" : draft.audioUrl}
+              value={
+                greeting.audioUrl.startsWith("data:") ? "" : greeting.audioUrl
+              }
             />
             <input
               accept="audio/*"
@@ -361,12 +601,12 @@ function AdminPanel({
               type="file"
             />
           </div>
-          {draft.audioUrl && (
+          {greeting.audioUrl && (
             <button
               className="remove-audio"
               onClick={() => {
-                updateField("audioUrl", "");
-                if (fileInput.current) fileInput.current.value = "";
+                updateField("audioUrl", "")
+                if (fileInput.current) fileInput.current.value = ""
               }}
               type="button"
             >
@@ -374,8 +614,8 @@ function AdminPanel({
             </button>
           )}
           <p className="field-help">
-            Para que el audio funcione desde otros dispositivos, utiliza una URL pública. Los
-            archivos subidos solo se guardan en este dispositivo.
+            Al guardar los cambios, el audio y la dedicatoria se publicarán para
+            todos. También puedes pegar una URL pública de audio.
           </p>
         </fieldset>
 
@@ -386,47 +626,83 @@ function AdminPanel({
           {status}
         </p>
       </form>
-
     </aside>
-  );
+  )
 }
 
 export default function App() {
   const [greeting, setGreeting] = useState<Greeting>(() => {
-    const sharedGreeting = greetingFromUrl();
-    if (sharedGreeting) return sharedGreeting;
+    const sharedGreeting = greetingFromUrl()
+    if (sharedGreeting) return sharedGreeting
 
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? withGreetingDefaults(JSON.parse(saved)) : defaultGreeting;
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? withGreetingDefaults(JSON.parse(saved)) : defaultGreeting
     } catch {
-      return defaultGreeting;
+      return defaultGreeting
     }
-  });
+  })
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [loginUsername, setLoginUsername] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginStatus, setLoginStatus] = useState("");
-  const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
+  const [draft, setDraft] = useState(greeting)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
+  const [loginUsername, setLoginUsername] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
+  const [loginStatus, setLoginStatus] = useState("")
+  const [isSubmittingLogin, setIsSubmittingLogin] = useState(false)
 
   useEffect(() => {
-    document.title = isAdmin ? "Editar dedicatoria | Las Flores" : "Una dedicatoria para ti";
-  }, [isAdmin]);
+    if (new URLSearchParams(window.location.search).has("g")) return
+
+    let isActive = true
+    fetch("/api/greeting", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return
+        const sharedGreeting = withGreetingDefaults(await response.json())
+        if (!isActive) return
+        setGreeting(sharedGreeting)
+        setDraft(sharedGreeting)
+      })
+      .catch(() => undefined)
+
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    document.title = isAdmin
+      ? "Editar dedicatoria | Las Flores"
+      : "Una dedicatoria para ti"
+  }, [isAdmin])
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmittingLogin(true);
-    setLoginStatus("");
+    event.preventDefault()
+    setLoginStatus("")
 
+    if (import.meta.env.DEV) {
+      if (loginUsername === "123" && loginPassword === "123") {
+        setDraft(greeting)
+        setIsAdmin(true)
+        setShowLogin(false)
+        setLoginPassword("")
+      } else {
+        setLoginStatus("En acceso local, el usuario y la contraseña son 123.")
+      }
+      return
+    }
+
+    setIsSubmittingLogin(true)
     try {
       const response = await fetch("/api/admin-login", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
-      });
+        body: JSON.stringify({
+          username: loginUsername,
+          password: loginPassword,
+        }),
+      })
 
       if (!response.ok) {
         const errorMessages: Record<number, string> = {
@@ -434,55 +710,83 @@ export default function App() {
           403: "Vercel bloqueó la solicitud. Abre la página desde el mismo dominio del sitio.",
           404: "No se encontró la función de acceso. Revisa el último despliegue de Vercel.",
           503: "Falta configurar ADMIN_USERNAME, ADMIN_PASSWORD o ADMIN_SESSION_SECRET en Production.",
-        };
+        }
         setLoginStatus(
           errorMessages[response.status] ??
             `El servidor de acceso respondió con un error (${response.status}).`,
-        );
-        return;
+        )
+        return
       }
 
-      setIsAdmin(true);
-      setShowLogin(false);
-      setLoginPassword("");
+      setDraft(greeting)
+      setIsAdmin(true)
+      setShowLogin(false)
+      setLoginPassword("")
     } catch {
-      setLoginStatus("No se pudo conectar con el servidor de acceso.");
+      setLoginStatus("No se pudo conectar con el servidor de acceso.")
     } finally {
-      setIsSubmittingLogin(false);
+      setIsSubmittingLogin(false)
     }
   }
 
   async function handleAdminLogout() {
+    if (import.meta.env.DEV) {
+      setIsAdmin(false)
+      return
+    }
+
     try {
       const response = await fetch("/api/admin-session", {
         method: "DELETE",
         credentials: "same-origin",
-      });
-      if (response.ok) setIsAdmin(false);
+      })
+      if (response.ok) setIsAdmin(false)
     } catch {
       // Keep the editor visible if the server could not end the session.
     }
   }
 
-  function saveGreeting(nextGreeting: Greeting) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextGreeting));
-    setGreeting(nextGreeting);
+  async function saveGreeting(nextGreeting: Greeting) {
+    if (nextGreeting.audioUrl.startsWith("data:")) {
+      throw new Error("Audio stored only in browser")
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextGreeting))
+    setGreeting(nextGreeting)
+    setDraft(nextGreeting)
+
+    if (import.meta.env.DEV) return false
+
+    const response = await fetch("/api/greeting", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nextGreeting),
+    })
+    if (!response.ok) throw new Error("Shared greeting save failed")
+    return true
   }
 
   return (
     <div
       className={isAdmin ? "app-shell admin-mode" : "app-shell"}
-      style={{ "--page-color": greeting.backgroundColor } as CSSProperties}
+      style={
+        {
+          "--page-color": (isAdmin ? draft : greeting).backgroundColor,
+        } as CSSProperties
+      }
     >
       <button
-        aria-label={isAdmin ? "Cerrar sesión de administrador" : "Acceso de administrador"}
+        aria-label={
+          isAdmin ? "Cerrar sesión de administrador" : "Acceso de administrador"
+        }
         className="admin-lock"
         onClick={() => {
           if (isAdmin) {
-            void handleAdminLogout();
+            void handleAdminLogout()
           } else {
-            setLoginStatus("");
-            setShowLogin(true);
+            setLoginStatus("")
+            setShowLogin(true)
           }
         }}
         title={isAdmin ? "Cerrar sesión" : "Acceso de administrador"}
@@ -502,10 +806,20 @@ export default function App() {
           )}
         </svg>
       </button>
-      <GreetingCard greeting={greeting} />
+      <GreetingCard
+        greeting={isAdmin ? draft : greeting}
+        isAdmin={isAdmin}
+        onMove={(name, position) => {
+          setDraft((current) => ({
+            ...current,
+            positions: { ...current.positions, [name]: position },
+          }))
+        }}
+      />
       {isAdmin && (
         <AdminPanel
-          greeting={greeting}
+          greeting={draft}
+          onDraftChange={setDraft}
           onExit={() => void handleAdminLogout()}
           onSave={saveGreeting}
         />
@@ -515,7 +829,7 @@ export default function App() {
           className="login-backdrop"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !isSubmittingLogin) {
-              setShowLogin(false);
+              setShowLogin(false)
             }
           }}
         >
@@ -560,7 +874,11 @@ export default function App() {
               <p aria-live="polite" className="login-status" role="status">
                 {loginStatus}
               </p>
-              <button className="login-submit" disabled={isSubmittingLogin} type="submit">
+              <button
+                className="login-submit"
+                disabled={isSubmittingLogin}
+                type="submit"
+              >
                 {isSubmittingLogin ? "Verificando..." : "Ingresar"}
               </button>
             </form>
@@ -568,5 +886,5 @@ export default function App() {
         </div>
       )}
     </div>
-  );
+  )
 }

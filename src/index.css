@@ -202,13 +202,55 @@ a {
   position: relative;
   z-index: 1;
   min-height: 615px;
-  padding: 34px 34px 30px;
+  padding: 0;
   box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.card-item {
+  position: absolute;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 20px;
+  max-width: calc(100% - 24px);
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+}
+
+.card-item-image {
+  width: min(190px, calc(100% - 40px));
+}
+
+.card-item-title,
+.card-item-message {
+  width: min(440px, calc(100% - 50px));
+}
+
+.card-item-audio,
+.card-item-button {
+  width: max-content;
+}
+
+.card-item.is-draggable {
+  z-index: 2;
+  border: 1px dashed transparent;
+  border-radius: 5px;
+  padding: 5px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.card-item.is-draggable:hover,
+.card-item.is-draggable:focus-visible {
+  border-color: #4f8651;
+  background: rgba(240, 248, 240, 0.72);
+  outline: none;
+}
+
+.card-item.is-draggable:active {
+  cursor: grabbing;
 }
 
 .brand-logo {
@@ -217,27 +259,23 @@ a {
   object-fit: contain;
 }
 
-.greeting-copy {
-  margin: 0;
-  text-align: center;
-}
-
-.greeting-copy h1 {
+.greeting-title {
   max-width: 430px;
-  margin: 0 auto 16px;
+  margin: 0;
   font-size: clamp(27px, 6vw, 34px);
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: -1px;
+  text-align: center;
 }
 
-.greeting-copy p {
+.greeting-message {
   max-width: 440px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   color: #576a81;
   font-size: 15px;
   line-height: 1.65;
-  text-align: justify;
 }
 
 .audio-control {
@@ -437,6 +475,44 @@ a {
   gap: 17px;
 }
 
+.alignment-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.alignment-control span {
+  flex-basis: 100%;
+  color: #48576a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alignment-control button,
+.reset-positions {
+  min-height: 34px;
+  border: 1px solid #d6ded6;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #48576a;
+  background: #fbfcfb;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.alignment-control button.alignment-active {
+  border-color: #39723c;
+  color: #fff;
+  background: #39723c;
+}
+
+.reset-positions {
+  align-self: flex-start;
+  margin-bottom: 14px;
+}
+
 .admin-panel label,
 .admin-panel legend {
   color: #48576a;
@@ -624,6 +700,14 @@ a {
 
   .admin-mode .card-content {
     min-height: 570px;
+  }
+
+  .greeting-title {
+    font-size: 27px;
+  }
+
+  .greeting-message {
+    font-size: 13px;
   }
 
   .admin-panel {
