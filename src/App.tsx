@@ -663,6 +663,7 @@ export default function App() {
   const [draft, setDraft] = useState(greeting)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
+  const [loginEmail, setLoginEmail] = useState("marketing@gmail.com")
   const [loginPassword, setLoginPassword] = useState("")
   const [loginStatus, setLoginStatus] = useState("")
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false)
@@ -739,7 +740,7 @@ export default function App() {
     setIsSubmittingLogin(true)
     try {
       const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: "Marketing@gmail.com",
+        email: loginEmail.trim(),
         password: loginPassword,
       })
 
@@ -883,10 +884,10 @@ export default function App() {
                 Correo electrónico
                 <input
                   autoComplete="email"
-                  readOnly
+                  onChange={(event) => setLoginEmail(event.target.value)}
                   required
                   type="email"
-                  value="Marketing@gmail.com"
+                  value={loginEmail}
                 />
               </label>
               <label>
